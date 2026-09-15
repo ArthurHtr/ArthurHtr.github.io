@@ -4,11 +4,13 @@ Interactive conceptual malting facility built with React and Three.js. Inspired 
 
 ## Review
 
-- Explore the facility: visit six process stages and compare traditional operation with possible AI support.
-- Drag to orbit, scroll or pinch to zoom. Reset view returns to the overview.
-- Cutaway reveals germination beds; Pause animation supports presentation narration.
-- AI control layer connects production data to the broader agricultural, logistics and customer context.
-- The evolution timeline moves between conventional, connected and AI-enabled views.
+- Start the journey and use Next to visit the six production stages.
+- At stage 5 the camera automatically approaches the kiln, lifts its roof and reveals four equipment zones.
+- Four clicks explore energy optimisation, quality prediction, maintenance and planning, with proposed actions for operator review.
+- Next then exits the kiln and continues to distribution; the final screen offers Replay journey.
+- Pause stops equipment, particles and camera transitions. Resume continues where the tour paused.
+- Explore freely enables orbit, scroll/pinch zoom and stage markers; Return to journey restores the narrative.
+- Arrow keys also navigate when focus is outside a button.
 - All content remains accessible through the HTML interface if WebGL is unavailable.
 
 ## Development
@@ -17,6 +19,6 @@ Use Node.js 22.13 or newer. Install dependencies with `npm ci`, start with `npm 
 
 ## Publication
 
-The Sites project ID is recorded in `.openai/hosting.json`. The first hosted version is owner-private for review. Do not change the audience to public without the owner's approval. Once approved for public access, use that URL as the hyperlink on a PowerPoint image.
+The Sites project ID is recorded in `.openai/hosting.json`. The current audience is the workspace, as verified before this update. Keep that audience when publishing updates. Use the hosted URL as the hyperlink on a PowerPoint image; viewers need workspace access.
 
 No confidential data, actual factory layouts or factual performance metrics are used. Animation paths are illustrative, not process-engineering diagrams.

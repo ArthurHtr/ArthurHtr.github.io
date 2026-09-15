@@ -4,18 +4,20 @@ import * as T from "three";
 import {OrbitControls} from "three/addons/controls/OrbitControls.js";
 import {RoomEnvironment} from "three/addons/environments/RoomEnvironment.js";
 import {stages} from "../data/stages";
+import {createKilnInterior} from "./kiln-interior";
 
-type Props={ai:boolean;selected:number|null;cutaway:boolean;playing:boolean;reset:number;zoom:number;layer:boolean;onSelect:(i:number)=>void};
+type Props={ai:boolean;selected:number|null;cutaway:boolean;playing:boolean;reset:number;zoom:number;layer:boolean;onSelect:(i:number)=>void;tourStep?:number;onSettled?:()=>void};
 export default function Factory(props:Props){
- const host=useRef<HTMLDivElement>(null),labels=useRef<(HTMLButtonElement|null)[]>([]),live=useRef(props);
+ const host=useRef<HTMLDivElement>(null),labels=useRef<(HTMLButtonElement|null)[]>([]),zoneLabels=useRef<(HTMLDivElement|null)[]>([]),live=useRef(props);
  const [error,setError]=useState(false),[loaded,setLoaded]=useState(false),[retry,setRetry]=useState(0);
  live.current=props;
+ useEffect(()=>{if(error)props.onSettled?.();},[error,props.tourStep,props.reset,props.onSettled]);
  useEffect(()=>{
   if(!host.current)return; const mount=host.current;
   let renderer:T.WebGLRenderer;
   try{renderer=new T.WebGLRenderer({antialias:true,alpha:true,powerPreference:"high-performance"});}catch{setError(true);return;}
   setError(false);setLoaded(false);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio,1.7));renderer.setClearColor(0x000000,0);renderer.shadowMap.enabled=true;renderer.shadowMap.type=T.PCFSoftShadowMap;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,1.7));renderer.setClearColor(0x000000,0);renderer.shadowMap.enabled=true;renderer.shadowMap.type=T.PCFShadowMap;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1;
   mount.appendChild(renderer.domElement);
   const scene=new T.Scene();const camera=new T.PerspectiveCamera(35,1,.1,220);
   const basePos=new T.Vector3(39,32,43); camera.position.copy(basePos);
@@ -85,11 +87,14 @@ export default function Factory(props:Props){
   }
   for(let j=0;j<3;j++){cyl(.36,1.7,8.65,.9,-7+j*2.2,silver);pipe([8,.8,-7+j*2.2],[8.65,.8,-7+j*2.2],.2);}
   // 05. Kiln house, heat recovery, ducts, chimneys and solar array.
-  building(13,-4.5,5.7,6.8,3.8,gold);
+  const kilnStart=plant.children.length;
+  const kilnRoof=building(13,-4.5,5.7,6.8,3.8,gold);
   for(let i=0;i<3;i++){let x=11.1+i*1.8;cyl(.46,2.1,x,4.9,-6.4,silver);cyl(.58,.18,x,6.04,-6.4,dark);pipe([x,3.9,-4.5],[x,4.6,-4.5],.3);cyl(.55,.1,x,4.65,-4.5,dark);}
   box(1.9,2.4,3,16.65,1.3,-4.3,steel);for(let i=0;i<9;i++)box(1.94,.035,3.04,16.65,.3+i*.25,-4.3,dark);
   pipe([14.8,2.6,-4.3],[16.65,2.6,-4.3],.22,orange);pipe([16.65,2.6,-4.3],[16.65,1,-.8],.16,orange);
   textLabel("KILNING",13,2.5,-1.075,3);
+  const kilnShell=plant.children.slice(kilnStart);
+  const kilnRoofBase=kilnRoof.position.y;
   // 06. Dispatch warehouse, loading docks, pallet stacks and bulk tanker.
   building(10.8,5.2,9.4,4.5,3.15,dark);
   for(let x=7.4;x<=14.4;x+=2.3){box(1.5,1.8,.09,x,1.15,7.5,dark);for(let j=.5;j<1.9;j+=.2)box(1.43,.025,.04,x,j,7.56,steel);box(1.8,.15,.8,x,.2,7.85,steel);}
@@ -132,26 +137,52 @@ export default function Factory(props:Props){
   const energyCurve=new T.CatmullRomCurve3([new T.Vector3(16.6,1.6,-4),new T.Vector3(16.6,1.6,-.8),new T.Vector3(5,1.6,-.8),new T.Vector3(-2.5,1.6,-5)]);const energyPositions=new Float32Array(24*3),energyGeo=new T.BufferGeometry();energyGeo.setAttribute("position",new T.BufferAttribute(energyPositions,3));dataGroup.add(new T.Points(energyGeo,new T.PointsMaterial({color:0xf7a265,size:.1,depthWrite:false})));
   const steamGeo=new T.BufferGeometry(),steamPositions=new Float32Array(35*3);steamGeo.setAttribute("position",new T.BufferAttribute(steamPositions,3));plant.add(new T.Points(steamGeo,new T.PointsMaterial({color:0xc8dbd9,size:.2,opacity:.23,transparent:true,depthWrite:false})));
 
-  let width=1,height=1;
-  function resize(){width=mount.clientWidth;height=mount.clientHeight;renderer.setSize(width,height);camera.aspect=width/height;basePos.set(39,32,43).multiplyScalar(Math.min(1.4,Math.max(1,1.25/camera.aspect)));if(live.current.selected===null&&!live.current.layer)camera.position.copy(basePos);camera.updateProjectionMatrix();}
+  const interior=createKilnInterior();plant.add(interior.group);interior.group.visible=false;
+  const outsideObjects=plant.children.filter(o=>o!==interior.group&&!kilnShell.includes(o));
+  const stageHalo=mesh(new T.RingGeometry(2.8,2.87,72),new T.MeshBasicMaterial({color:0xe2be7c,transparent:true,opacity:.75,side:T.DoubleSide,depthWrite:false}),0,.04,0,scene);stageHalo.rotation.x=-Math.PI/2;
+  const kilnRoofMaterial=gold.clone();kilnRoofMaterial.transparent=true;kilnRoof.material=kilnRoofMaterial;
+  let width=1,height=1,resizeNeeded=true;
+  function resize(){width=mount.clientWidth;height=Math.max(1,mount.clientHeight);renderer.setSize(width,height);camera.aspect=width/height;basePos.set(39,32,43).multiplyScalar(Math.min(1.45,Math.max(1,1.2/camera.aspect)));camera.updateProjectionMatrix();resizeNeeded=true;}
   const observer=new ResizeObserver(resize);observer.observe(mount);resize();
-  let cancelled=false,frame=0,elapsed=0,lastTime=performance.now();let lastSelected:number|null=null,lastReset=0,lastZoom=0,lastLayer=false;
-  let transition=false;const targetPos=new T.Vector3(),targetLook=new T.Vector3();
+  let cancelled=false,frame=0,elapsed=0,lastTime=performance.now(),lastKey="",lastZoom=0,openness=0;
+  type Shot={position:T.Vector3;look:T.Vector3;duration:number;open:number};
+  let shots:Shot[]=[],shotTime=0,fromPos=camera.position.clone(),fromLook=controls.target.clone(),fromOpen=0;
   const reduced=window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  function cancelTransition(){transition=false;}
-  controls.addEventListener("start",cancelTransition);
-  function onLost(e:Event){e.preventDefault();setError(true);}
+  const vec=(a:number[])=>new T.Vector3(...a as [number,number,number]);
+  function beginShot(){shotTime=0;fromPos.copy(camera.position);fromLook.copy(controls.target);fromOpen=openness;}
+  function onLost(e:Event){e.preventDefault();setError(true);live.current.onSettled?.();}
   renderer.domElement.addEventListener("webglcontextlost",onLost);
   function animate(time:number){if(cancelled)return;frame=requestAnimationFrame(animate);const dt=Math.max(0,Math.min((time-lastTime)/1000,.05));lastTime=time;const p=live.current;
    if(p.playing&&!reduced)elapsed+=dt;
-   if(p.selected!==lastSelected||p.reset!==lastReset||p.layer!==lastLayer){lastSelected=p.selected;lastReset=p.reset;lastLayer=p.layer;
-    if(p.selected!==null){const s=stages[p.selected];targetLook.set(s.position[0],1.5,s.position[1]);targetPos.copy(targetLook).add(new T.Vector3(17,16,23));}
-    else if(p.layer){targetLook.set(0,1,0);targetPos.set(32,40,39);}else{targetLook.set(0,0,0);targetPos.copy(basePos);}
-    transition=true;
+   const guided=p.tourStep!==undefined,inside=guided&&p.tourStep!>=5&&p.tourStep!<=8;
+   const key=String(p.tourStep)+":"+p.selected+":"+p.reset;
+   controls.enabled=!guided;controls.minDistance=guided?3:12;controls.maxDistance=120;
+   if(key!==lastKey||resizeNeeded){
+    lastKey=key;resizeNeeded=false;shots=[];
+    const add=(position:number[]|T.Vector3,look:number[],duration:number,open:number)=>shots.push({position:position instanceof T.Vector3?position.clone():vec(position),look:vec(look),duration,open});
+    const narrow=Math.max(1,Math.min(1.55,1.1/camera.aspect));
+    if(inside){
+     if(openness<.5){add([28,18,15],[13,1.6,-4.5],1.15,0);add([28,18,15],[13,1.6,-4.5],.65,1);}
+     const offsets=[[8,9,11],[6,10,10],[10,8,9],[8,10,9]];
+     const offset=vec(offsets[p.tourStep!-5]).multiplyScalar(narrow);
+     add(vec([13,1,-4.5]).add(offset),[13,1,-4.5],1.35,1);
+    }else{
+     if(openness>.05)add([28,18,15],[13,1.6,-4.5],1.15,0);
+     if(p.selected!==null){const s=stages[p.selected];const offset=vec(p.selected===0?[19,14,19]:[17,16,23]).multiplyScalar(narrow);
+      add(vec([s.position[0],1.4,s.position[1]]).add(offset),[s.position[0],1.4,s.position[1]],1.4,0);
+     }else add(basePos,[0,0,0],1.7,0);
+    }
+    beginShot();
    }
-   if(p.zoom!==lastZoom){const factor=Math.pow(.83,p.zoom-lastZoom);camera.position.sub(controls.target).multiplyScalar(factor).add(controls.target);lastZoom=p.zoom;transition=false;}
-   if(transition){const k=reduced?1:1-Math.exp(-dt*4);camera.position.lerp(targetPos,k);controls.target.lerp(targetLook,k);if(camera.position.distanceTo(targetPos)<.04)transition=false;}
-   roofs.forEach(r=>{r.visible=!p.cutaway;});dataGroup.visible=p.ai;aiMat.opacity=p.layer?.9:.65;
+   if(shots.length&&(p.playing||reduced)){const shot=shots[0];shotTime+=dt;const t=reduced?1:Math.min(1,shotTime/shot.duration),ease=t*t*(3-2*t);camera.position.lerpVectors(fromPos,shot.position,ease);controls.target.lerpVectors(fromLook,shot.look,ease);openness=T.MathUtils.lerp(fromOpen,shot.open,ease);if(t===1){shots.shift();if(shots.length)beginShot();else p.onSettled?.();}}
+   if(p.zoom!==lastZoom){camera.position.sub(controls.target).multiplyScalar(Math.pow(.83,p.zoom-lastZoom)).add(controls.target);lastZoom=p.zoom;}
+   roofs.forEach(r=>{r.visible=!p.cutaway;});
+   kilnShell.forEach(o=>{o.visible=openness<.55;});
+   kilnRoof.visible=openness<.95;kilnRoof.position.y=kilnRoofBase+openness*3;kilnRoofMaterial.opacity=1-openness;
+   interior.group.visible=openness>.05;interior.tick(elapsed,inside?p.tourStep!-5:0);
+   outsideObjects.forEach(o=>{o.visible=openness<.97;});
+   dataGroup.visible=p.ai&&openness<.1&&(!guided||p.tourStep===0||p.tourStep===10);aiMat.opacity=p.layer?.9:.4;
+   stageHalo.visible=p.selected!==null&&openness<.1;if(p.selected!==null){stageHalo.position.x=stages[p.selected].position[0];stageHalo.position.z=stages[p.selected].position[1];}
    nucleus.rotation.y=elapsed*.5;halo.rotation.z=elapsed*.2;halo2.scale.setScalar(1+Math.sin(elapsed*1.4)*.08);
    for(let i=0;i<dataCount;i++){const point=lines[i%lines.length].getPoint((elapsed*.12+i/dataCount)%1);dataPositions.set(point.toArray(),i*3);}dataGeometry.attributes.position.needsUpdate=true;
    for(let i=0;i<210;i++){const point=pathCurve.getPoint((elapsed*.026+i/210)%1);grainPositions[i*3]=point.x+Math.sin(i*17)*.09;grainPositions[i*3+1]=point.y+.15+Math.sin(i*3)*.05;grainPositions[i*3+2]=point.z+Math.cos(i*7)*.07;}grainGeo.attributes.position.needsUpdate=true;
@@ -159,10 +190,11 @@ export default function Factory(props:Props){
    for(let i=0;i<35;i++){const f=(elapsed*.12+i/35)%1;steamPositions[i*3]=11.1+(i%3)*1.8+Math.sin(i*3+f)*f*.8;steamPositions[i*3+1]=6.1+f*2.7;steamPositions[i*3+2]=-6.4+f*.8;}steamGeo.attributes.position.needsUpdate=true;
    rotors.forEach((r,i)=>{r.position.x=5+Math.sin(elapsed*.14+i)*1.6;});movingTruck.position.z=5-Math.sin(elapsed*.06)*3;
    controls.update();renderer.render(scene,camera);
-   stages.forEach((s,i)=>{const el=labels.current[i];if(!el)return;const v=new T.Vector3(s.position[0],s.height,s.position[1]).project(camera);el.style.left=((v.x*.5+.5)*width)+"px";el.style.top=((-v.y*.5+.5)*height)+"px";el.style.visibility=(v.z>1||v.z< -1||v.x< -1.1||v.x>1.1||v.y< -1.1||v.y>1.1)?"hidden":"visible";el.style.opacity=p.selected!==null&&p.selected!==i?"0.45":"1";});
+   interior.labels.forEach((label,i)=>{const el=zoneLabels.current[i];if(!el)return;const v=label.position.clone().project(camera);el.style.left=((v.x*.5+.5)*width)+"px";el.style.top=((-v.y*.5+.5)*height)+"px";el.style.visibility=openness>.9&&v.z<1?"visible":"hidden";});
+   stages.forEach((s,i)=>{const el=labels.current[i];if(!el)return;const v=new T.Vector3(s.position[0],s.height,s.position[1]).project(camera);el.style.left=((v.x*.5+.5)*width)+"px";el.style.top=((-v.y*.5+.5)*height)+"px";el.style.visibility=(inside||(guided&&p.selected!==i)||v.z>1||v.z< -1||v.x< -1.1||v.x>1.1||v.y< -1.1||v.y>1.1)?"hidden":"visible";el.style.opacity=p.selected!==null&&p.selected!==i?"0.45":"1";});
   }
   frame=requestAnimationFrame(animate);setLoaded(true);
   return()=>{cancelled=true;cancelAnimationFrame(frame);observer.disconnect();controls.dispose();renderer.domElement.removeEventListener("webglcontextlost",onLost);scene.traverse(obj=>{if(obj instanceof T.Mesh||obj instanceof T.Line||obj instanceof T.Points){obj.geometry?.dispose();const mats=Array.isArray(obj.material)?obj.material:[obj.material];mats.forEach(m=>{if("map"in m)(m as T.MeshBasicMaterial).map?.dispose();m.dispose();});}});env.dispose();renderer.dispose();renderer.domElement.remove();};
  },[retry]);
- return <><div className="canvas-mount" ref={host}/>{!loaded&&!error&&<div className="loading-scene"><span className="loading-ring"/><p>Preparing your view of the future…</p></div>}{error?<div className="fallback-scene"><h2>The malting journey</h2><p>The 3D view needs browser graphics acceleration. You can still explore all six stages using the buttons below.</p><button onClick={()=>{setError(false);setRetry(n=>n+1);}}>Retry 3D view</button></div>:<div className="hotspots">{stages.map((s,i)=><button key={s.short} ref={el=>{labels.current[i]=el;}} className={"hotspot "+(props.selected===i?"selected":"")} aria-label={"Explore "+s.title} onClick={()=>props.onSelect(i)}><span className="hotspot-number">0{i+1}</span><span className="hotspot-name">{s.short}</span></button>)}</div>}<div className="compass" aria-hidden="true"/></>;
+ return <><div className="canvas-mount" ref={host}/>{!loaded&&!error&&<div className="loading-scene"><span className="loading-ring"/><p>Preparing your view of the future…</p></div>}{error?<div className="fallback-scene"><h2>The malting journey</h2><p>The 3D view needs browser graphics acceleration. You can still follow the complete story using the Next arrow below.</p><button onClick={()=>{setError(false);setRetry(n=>n+1);}}>Retry 3D view</button></div>:<div className="hotspots">{stages.map((s,i)=><button key={s.short} ref={el=>{labels.current[i]=el;}} className={"hotspot "+(props.selected===i?"selected":"")} aria-label={"Explore "+s.title} disabled={props.tourStep!==undefined} onClick={()=>props.onSelect(i)}><span className="hotspot-number">0{i+1}</span><span className="hotspot-name">{s.short}</span></button>)}</div>}{props.tourStep!==undefined&&props.tourStep>=5&&props.tourStep<=8&&<div className="zone-labels" aria-hidden="true">{["A · Heat & airflow","B · Quality sensing","C · Fans & motors","D · Batch planning","AI decision layer"].map((name,i)=><div key={name} ref={el=>{zoneLabels.current[i]=el;}} className={"zone-label "+(i===4?"core":props.tourStep!-5===i?"active":"")}>{name}</div>)}</div>}</>;
 }
