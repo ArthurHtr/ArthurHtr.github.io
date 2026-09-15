@@ -144,7 +144,7 @@ export default function Factory(props:Props){
   let width=1,height=1,resizeNeeded=true;
   function resize(){width=mount.clientWidth;height=Math.max(1,mount.clientHeight);renderer.setSize(width,height);camera.aspect=width/height;basePos.set(39,32,43).multiplyScalar(Math.min(1.45,Math.max(1,1.2/camera.aspect)));camera.updateProjectionMatrix();resizeNeeded=true;}
   const observer=new ResizeObserver(resize);observer.observe(mount);resize();
-  let cancelled=false,frame=0,elapsed=0,lastTime=performance.now(),lastKey="",lastZoom=0,openness=0;
+  let cancelled=false,frame=0,elapsed=0,lastTime=performance.now(),lastKey="",lastZoom=0,openness=0,wasInside=false;
   type Shot={position:T.Vector3;look:T.Vector3;duration:number;open:number};
   let shots:Shot[]=[],shotTime=0,fromPos=camera.position.clone(),fromLook=controls.target.clone(),fromOpen=0;
   const reduced=window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -158,21 +158,26 @@ export default function Factory(props:Props){
    const key=String(p.tourStep)+":"+p.selected+":"+p.reset;
    controls.enabled=!guided;controls.minDistance=guided?3:12;controls.maxDistance=120;
    if(key!==lastKey||resizeNeeded){
+    const keepInteriorView=inside&&wasInside&&!resizeNeeded;
+    wasInside=inside;
     lastKey=key;resizeNeeded=false;shots=[];
     const add=(position:number[]|T.Vector3,look:number[],duration:number,open:number)=>shots.push({position:position instanceof T.Vector3?position.clone():vec(position),look:vec(look),duration,open});
     const narrow=Math.max(1,Math.min(1.55,1.1/camera.aspect));
     if(inside){
      if(openness<.5){add([28,18,15],[13,1.6,-4.5],1.15,0);add([28,18,15],[13,1.6,-4.5],.65,1);}
-     const offsets=[[8,9,11],[6,10,10],[10,8,9],[8,10,9]];
-     const offset=vec(offsets[p.tourStep!-5]).multiplyScalar(narrow);
-     add(vec([13,1,-4.5]).add(offset),[13,1,-4.5],1.35,1);
+     // All four use cases share one cutaway composition. Advancing changes
+     // the highlighted zone and explanation, without moving the camera.
+     if(!keepInteriorView){
+      const offset=vec([8,9,11]).multiplyScalar(narrow);
+      add(vec([13,1,-4.5]).add(offset),[13,1,-4.5],1.35,1);
+     }
     }else{
      if(openness>.05)add([28,18,15],[13,1.6,-4.5],1.15,0);
      if(p.selected!==null){const s=stages[p.selected];const offset=vec(p.selected===0?[19,14,19]:[17,16,23]).multiplyScalar(narrow);
       add(vec([s.position[0],1.4,s.position[1]]).add(offset),[s.position[0],1.4,s.position[1]],1.4,0);
      }else add(basePos,[0,0,0],1.7,0);
     }
-    beginShot();
+    if(shots.length)beginShot();else p.onSettled?.();
    }
    if(shots.length&&(p.playing||reduced)){const shot=shots[0];shotTime+=dt;const t=reduced?1:Math.min(1,shotTime/shot.duration),ease=t*t*(3-2*t);camera.position.lerpVectors(fromPos,shot.position,ease);controls.target.lerpVectors(fromLook,shot.look,ease);openness=T.MathUtils.lerp(fromOpen,shot.open,ease);if(t===1){shots.shift();if(shots.length)beginShot();else p.onSettled?.();}}
    if(p.zoom!==lastZoom){camera.position.sub(controls.target).multiplyScalar(Math.pow(.83,p.zoom-lastZoom)).add(controls.target);lastZoom=p.zoom;}
