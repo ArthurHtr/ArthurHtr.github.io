@@ -154,7 +154,7 @@ export default function Factory(props:Props){
   renderer.domElement.addEventListener("webglcontextlost",onLost);
   function animate(time:number){if(cancelled)return;frame=requestAnimationFrame(animate);const dt=Math.max(0,Math.min((time-lastTime)/1000,.05));lastTime=time;const p=live.current;
    if(p.playing&&!reduced)elapsed+=dt;
-   const guided=p.tourStep!==undefined,inside=guided&&p.tourStep!>=5&&p.tourStep!<=8;
+   const guided=p.tourStep!==undefined,inside=guided&&p.tourStep===5;
    const key=String(p.tourStep)+":"+p.selected+":"+p.reset;
    controls.enabled=!guided;controls.minDistance=guided?3:12;controls.maxDistance=120;
    if(key!==lastKey||resizeNeeded){
@@ -184,7 +184,7 @@ export default function Factory(props:Props){
    roofs.forEach(r=>{r.visible=!p.cutaway;});
    kilnShell.forEach(o=>{o.visible=openness<.55;});
    kilnRoof.visible=openness<.95;kilnRoof.position.y=kilnRoofBase+openness*3;kilnRoofMaterial.opacity=1-openness;
-   interior.group.visible=openness>.05;interior.tick(elapsed,inside?p.tourStep!-5:0);
+   interior.group.visible=openness>.05;interior.tick(elapsed,0);
    outsideObjects.forEach(o=>{o.visible=openness<.97;});
    dataGroup.visible=p.ai&&openness<.1&&(!guided||p.tourStep===0||p.tourStep===10);aiMat.opacity=p.layer?.9:.4;
    stageHalo.visible=p.selected!==null&&openness<.1;if(p.selected!==null){stageHalo.position.x=stages[p.selected].position[0];stageHalo.position.z=stages[p.selected].position[1];}
@@ -201,5 +201,5 @@ export default function Factory(props:Props){
   frame=requestAnimationFrame(animate);setLoaded(true);
   return()=>{cancelled=true;cancelAnimationFrame(frame);observer.disconnect();controls.dispose();renderer.domElement.removeEventListener("webglcontextlost",onLost);scene.traverse(obj=>{if(obj instanceof T.Mesh||obj instanceof T.Line||obj instanceof T.Points){obj.geometry?.dispose();const mats=Array.isArray(obj.material)?obj.material:[obj.material];mats.forEach(m=>{if("map"in m)(m as T.MeshBasicMaterial).map?.dispose();m.dispose();});}});env.dispose();renderer.dispose();renderer.domElement.remove();};
  },[retry]);
- return <><div className="canvas-mount" ref={host}/>{!loaded&&!error&&<div className="loading-scene"><span className="loading-ring"/><p>Preparing your view of the future…</p></div>}{error?<div className="fallback-scene"><h2>The malting journey</h2><p>The 3D view needs browser graphics acceleration. You can still follow the complete story using the Next arrow below.</p><button onClick={()=>{setError(false);setRetry(n=>n+1);}}>Retry 3D view</button></div>:<div className="hotspots">{stages.map((s,i)=><button key={s.short} ref={el=>{labels.current[i]=el;}} className={"hotspot "+(props.selected===i?"selected":"")} aria-label={"Explore "+s.title} disabled={props.tourStep!==undefined} onClick={()=>props.onSelect(i)}><span className="hotspot-number">0{i+1}</span><span className="hotspot-name">{s.short}</span></button>)}</div>}{props.tourStep!==undefined&&props.tourStep>=5&&props.tourStep<=8&&<div className="zone-labels" aria-hidden="true">{["A · Heat & airflow","B · Quality sensing","C · Fans & motors","D · Batch planning","AI decision layer"].map((name,i)=><div key={name} ref={el=>{zoneLabels.current[i]=el;}} className={"zone-label "+(i===4?"core":props.tourStep!-5===i?"active":"")}>{name}</div>)}</div>}</>;
+ return <><div className="canvas-mount" ref={host}/>{!loaded&&!error&&<div className="loading-scene"><span className="loading-ring"/><p>Preparing your view of the future…</p></div>}{error?<div className="fallback-scene"><h2>The malting journey</h2><p>The 3D view needs browser graphics acceleration. You can still follow the complete story using the Next arrow below.</p><button onClick={()=>{setError(false);setRetry(n=>n+1);}}>Retry 3D view</button></div>:<div className="hotspots">{stages.map((s,i)=><button key={s.short} ref={el=>{labels.current[i]=el;}} className={"hotspot "+(props.selected===i?"selected":"")} aria-label={"Explore "+s.title} disabled={props.tourStep!==undefined} onClick={()=>props.onSelect(i)}><span className="hotspot-number">0{i+1}</span><span className="hotspot-name">{s.short}</span></button>)}</div>}{props.tourStep===5&&<div className="zone-labels" aria-hidden="true">{["A · Heat & airflow","B · Quality sensing","C · Fans & motors","D · Batch planning","AI decision layer"].map((name,i)=><div key={name} ref={el=>{zoneLabels.current[i]=el;}} className={"zone-label "+(i===4?"core":"active")}>{name}</div>)}</div>}</>;
 }
