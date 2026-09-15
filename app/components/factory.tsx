@@ -3,7 +3,7 @@ import {useEffect,useRef,useState} from "react";
 import * as T from "three";
 import {OrbitControls} from "three/addons/controls/OrbitControls.js";
 import {RoomEnvironment} from "three/addons/environments/RoomEnvironment.js";
-import {stages} from "./stages";
+import {stages} from "../data/stages";
 
 type Props={ai:boolean;selected:number|null;cutaway:boolean;playing:boolean;reset:number;zoom:number;layer:boolean;onSelect:(i:number)=>void};
 export default function Factory(props:Props){

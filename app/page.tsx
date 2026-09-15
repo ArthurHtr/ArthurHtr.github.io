@@ -3,8 +3,8 @@ import { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import { ArrowUpRight, ArrowRight, ChevronLeft, ChevronRight, RotateCcw, Maximize, Minimize, Layers3, Play, Pause, Wheat, Cpu, X, Move, ZoomIn, ZoomOut, Sparkles, Info } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import { stages } from "./stages";
-const Factory = dynamic(() => import("./factory"), { ssr: false, loading: () => <div className="loading-scene"><span className="loading-ring"/><p>Preparing your view of the future…</p></div> });
+import { stages } from "./data/stages";
+const Factory = dynamic(() => import("./components/factory"), { ssr: false, loading: () => <div className="loading-scene"><span className="loading-ring"/><p>Preparing your view of the future…</p></div> });
 export default function Home() {
  const [ai,setAI]=useState(true),[selected,setSelected]=useState<number|null>(null),[cutaway,setCutaway]=useState(false),[playing,setPlaying]=useState(true),[reset,setReset]=useState(0),[zoom,setZoom]=useState(0),[layer,setLayer]=useState(false),[phase,setPhase]=useState(2),[full,setFull]=useState(false),[info,setInfo]=useState(false);
  const root=useRef<HTMLElement>(null),stage=selected===null?null:stages[selected];

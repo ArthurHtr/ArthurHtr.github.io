@@ -38,6 +38,12 @@ yarn-error.log*
 next-env.d.ts
 /dist/
 /.wrangler/
+# Local build and preview state
+/.next/
+/.vinext/
+/.sites-runtime/
+/.codex/
+/.agents/
 # Checkout-local execution profile and tool state; never publish them.
 /.sites-runtime/
 /.agents/
